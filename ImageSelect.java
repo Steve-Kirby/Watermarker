@@ -1,79 +1,202 @@
-import java.awt.AlphaComposite;
-import java.awt.Font;
+import java.awt.BorderLayout;
+import java.awt.Dimension;
 import java.awt.Graphics2D;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import javax.imageio.ImageIO;
 import javax.swing.ImageIcon;
+import javax.swing.JButton;
 import javax.swing.JFileChooser;
+import javax.swing.JFrame;
+import javax.swing.JOptionPane;
+import javax.swing.filechooser.FileFilter;
 
 public class ImageSelect {
-
+		
+	static File watermarkImage = null;
+	static File imageToWatermark = null;
+	static File save = null;
+	static ImageIcon watermarkIcon = null;
+	
 	public static void main(String[] args) {
 	
-		//Dialog to pick the folder to watermark (does whole folder)
-		JFileChooser chooser = new JFileChooser();
-	    chooser.setDialogTitle("Choose Directory to Watermark");
-	    chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-	    chooser.setAcceptAllFileFilterUsed(false);
+		final JFrame frame = new JFrame("Photo Watermarker");
+		
+		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		
+		JButton folderButton = new JButton("<html><center>"+"Watermark an"+"<br>"+"entire folder"+"</center></html>");
+				folderButton.setPreferredSize(new Dimension(200,100));
+				folderButton.addActionListener(new ActionListener() {
+
+					public void actionPerformed(ActionEvent e) {
+						FolderWatermark(frame);
+					}
+				
+				});
+				
+		JButton singleButton = new JButton("<html><center>"+"Watermark a"+"<br>"+"singular image"+"</center></html>");
+				singleButton.setPreferredSize(new Dimension(200,100));
+				singleButton.addActionListener(new ActionListener() {
+
+					public void actionPerformed(ActionEvent e) {
+						SingleWatermark(frame);
+					}
+				
+				});
+		
+				
+		JButton editWatermarkButton = new JButton("<html><center>"+"Choose image to"+"<br>"+"use as Watermark"+"</center></html>");
+				editWatermarkButton.setPreferredSize(new Dimension(200,100));
+				editWatermarkButton.addActionListener(new ActionListener() {
+
+					public void actionPerformed(ActionEvent e) {
+						
+						EditWatermark(frame);
+					}
+				
+				});
+				
+		frame.getContentPane().add(editWatermarkButton,BorderLayout.NORTH);
+		frame.getContentPane().add(folderButton, BorderLayout.CENTER);
+		frame.getContentPane().add(singleButton, BorderLayout.SOUTH);
+		
+		
+		frame.pack();
+		frame.setVisible(true);
+		
+	}
+	
+	static void EditWatermark(JFrame frame) {
+		
+		JFileChooser chooser = FileSelect("Choose Image to use as Watermark", JFileChooser.FILES_ONLY);
 	    
-	    //If use has chosen, then use this folder to watermark
-	    File folder = null;
 	    if (chooser.showOpenDialog(chooser) == JFileChooser.APPROVE_OPTION) { 
-	         folder = chooser.getSelectedFile();
+	         watermarkImage = chooser.getSelectedFile();
+	         watermarkIcon = new ImageIcon(watermarkImage.getPath()); 
+	    } else {
+	    	JOptionPane.showMessageDialog(frame, "Please pick an image to use as a watermark!");
 	    }
 	    
-	    //Choose where to save watermarked photos to
-	    chooser.setDialogTitle("Choose Directory to Save Photos to");
-	   
-	    File saveFolder = null;
-	    if(chooser.showOpenDialog(chooser) == JFileChooser.APPROVE_OPTION) { 
-	         saveFolder = chooser.getSelectedFile();
-	    }
-
-	    //Each file/picture in the folder
-		for (File fileEntry : folder.listFiles()) {
+	}
+	
+	static void SingleWatermark(JFrame frame) {
+		
+		if (checkForWatermark(frame)) {
+			JFileChooser chooser = FileSelect("Choose Image to Watermark",JFileChooser.FILES_ONLY);
+		    
+		    if (chooser.showOpenDialog(chooser) == JFileChooser.APPROVE_OPTION) { 
+		        SaveToFolder(frame);   
+		        SaveWatermarkedImage(chooser.getSelectedFile());
+		    } else {
+		    	JOptionPane.showMessageDialog(frame, "Please pick an image you would like to watermark!");
+		    }
+		}
+	  
+	}
+	
+	static void FolderWatermark(JFrame frame) {
+		
+		if (checkForWatermark(frame)) {
+			JFileChooser chooser = FileSelect("Choose Folder to Watermark", JFileChooser.DIRECTORIES_ONLY);
+		    
+		    File folder = null;
+		    if (chooser.showOpenDialog(chooser) == JFileChooser.APPROVE_OPTION) { 
+		         
+		    	folder = chooser.getSelectedFile();
+		    }
+		    
+		    SaveToFolder(frame);
+		    
+		    
+		    if(save != null) {
+		    	for (File fileEntry : folder.listFiles()) {
+		    		SaveWatermarkedImage(fileEntry);
+		    	}
+		    }
+		    
+		}
+	}
+	
+	static boolean checkForWatermark(JFrame frame) {
+		
+		if(watermarkIcon == null) {
+			JOptionPane.showMessageDialog(frame, "Please pick an image to use as a watermark!");
+			return false;
+		}
+		return true;
+		
+	}
+	
+	
+	static void SaveWatermarkedImage(File fileEntry) {
+		
+		
 			ImageIcon icon = new ImageIcon(fileEntry.getPath());
-			//System.out.println(fileEntry.getName()); //DEBUG
-
-			// create BufferedImage object of same width and height as of
-			// original image
+			
 			BufferedImage bufferedImage = new BufferedImage(icon.getIconWidth(), icon.getIconHeight(),
-					BufferedImage.TYPE_INT_RGB);
-
-			// create graphics object and add original image to it
+					BufferedImage.TYPE_INT_ARGB);
+			
 			Graphics2D graphics = (Graphics2D) bufferedImage.getGraphics();
 			graphics.drawImage(icon.getImage(), 0, 0, null);
-
-			// set font for the watermark text
-			//.6 alpha(transparency)
-			graphics.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, .6f));
-			//text size is a 6th of the picture height in bold
-			graphics.setFont(new Font("Arial", Font.BOLD, icon.getIconHeight()/6));
-			//angle the text
-			graphics.rotate(-Math.PI/12);
 			
-			// unicode character for (c) is \u00a9
-			String watermark = "Steven Kirby";
-			String watermark2 = "Photography \u00a9";
 			
-			// add the watermark text in place
-			graphics.drawString(watermark, (int)(icon.getIconWidth()*0.05),(int) (icon.getIconHeight()*0.6));
-			graphics.drawString(watermark2, (int)(icon.getIconWidth()*0.03),(int) (icon.getIconHeight()*0.8));
-			//clear for next picture
+			graphics.drawImage(watermarkIcon.getImage(),0,0,bufferedImage.getHeight(), bufferedImage.getWidth(), null);
 			graphics.dispose();
-
-			//write the file to 
-			File newFile = new File(saveFolder+"/WM_" + fileEntry.getName());
+			
+			File newFile = new File(save + "/WM_" + fileEntry.getName());
+			 
 			try {
-				ImageIO.write(bufferedImage, "JPG", newFile);
+				ImageIO.write(bufferedImage, "png", newFile);
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
+	   
+	}
+	
+	static JFileChooser FileSelect(String title, int type) {
+		
+		JFileChooser chooser = new JFileChooser();
+		chooser.setDialogTitle(title);
+		chooser.setFileSelectionMode(type);
+		chooser.setAcceptAllFileFilterUsed(false);
+		
+		if (type == JFileChooser.FILES_ONLY) {
+		chooser.setFileFilter(new FileFilter() {
 
-			//System.out.println(newFile.getPath() + " created successfully!"); //DEBUG
+			   public String getDescription() {
+			       return "JPG Images (*.jpg), PNG Images (*.png)";
+			   }
+
+			   public boolean accept(File f) {
+			       if (f.isDirectory()) {
+			           return true;
+			       } else {
+			           String filename = f.getName().toLowerCase();
+			           return filename.endsWith(".jpg") || filename.endsWith(".jpeg") || filename.endsWith(".png");
+			       }
+			   }
+			});
 		}
+		return chooser;
 		
 	}
+	
+	static void SaveToFolder(JFrame frame) {
+ 	    
+		JFileChooser chooser = FileSelect("Choose Folder to Save to", JFileChooser.DIRECTORIES_ONLY);
+		
+	    
+	    while(!(chooser.showOpenDialog(chooser) == JFileChooser.APPROVE_OPTION)) {
+	    	
+	    	JOptionPane.showMessageDialog(frame, "Please pick a folder to save the image to!");
+	    	chooser = FileSelect("Choose Folder to Save to", JFileChooser.DIRECTORIES_ONLY);
+	 	    
+	    }
+	    
+	    save = chooser.getSelectedFile(); 
+	}
+	
 }
